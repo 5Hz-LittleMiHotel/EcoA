@@ -187,16 +187,25 @@ class TeammateManager:
             )
         approve = bool(msg.get("approve"))
         feedback = msg.get("feedback", "")
+        next_action = msg.get("next_action") or ("proceed" if approve else "stop")
         self._clear_plan_waiting(name, "idle")
-        self._set_initial_plan_required(name, not approve)
+        self._set_initial_plan_required(name, next_action == "revise")
         if approve:
             return (
-                f"<plan_approved request_id=\"{req_id}\">"
+                f"<plan_approved request_id=\"{req_id}\" next_action=\"proceed\">"
                 f"You may proceed with the approved plan.</plan_approved>"
             )
+        if next_action == "revise":
+            return (
+                f"<plan_rejected request_id=\"{req_id}\" next_action=\"revise\">"
+                f"Feedback: {feedback}\n"
+                f"Revise your plan and submit a new plan_approval request before doing major work."
+                f"</plan_rejected>"
+            )
         return (
-            f"<plan_rejected request_id=\"{req_id}\">"
-            f"Feedback: {feedback}\nRevise your plan before doing major work."
+            f"<plan_rejected request_id=\"{req_id}\" next_action=\"stop\">"
+            f"Feedback: {feedback}\n"
+            f"Stop working on this task and return to idle. Do not submit another plan unless the lead asks you to."
             f"</plan_rejected>"
         )
 
@@ -266,6 +275,8 @@ class TeammateManager:
             f"Use send_message only for normal chat. Complete your task. "
             f"If your prompt asks for a plan, call the plan_approval tool early, after at most a brief inspection. "
             f"Submit plans via the plan_approval tool before major work; do not send plan_approval_request with send_message. "
+            f"If a plan is rejected with next_action='stop', stop the current task and enter idle. "
+            f"If it is rejected with next_action='revise', revise and resubmit a plan before doing major work. "
             f"Respond to shutdown_request with shutdown_response. "
             f"Use idle tool when you have no more work. Idle is a standby state, not shutdown. You will auto-claim new tasks."
         )

@@ -19,6 +19,8 @@ Multi-Agent:
           Idle teammates are still available; send_message wakes an idle teammate if its thread is not running.
           Use shutdown only when explicitly requested.
           Plan approval must use the plan_approval tool with a real request_id from a teammate's plan_approval tool call; do not approve plain chat messages as plans.
+          For plan_approval, approve=false defaults to next_action="stop". Use next_action="revise" only when the user wants the teammate to revise and resubmit.
+          After each plan review, tell the user which plan was reviewed, whether it was approved/rejected, why, and whether the teammate will proceed, revise, or stop.
           Teammates are autonomous -- they find work themselves.
 Behavior: Prefer using tools over generating prose.
 """
