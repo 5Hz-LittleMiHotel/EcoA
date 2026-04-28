@@ -45,10 +45,47 @@ class TeammateManager:
             if status in ("working", "idle"):
                 member["status"] = "shutdown"
                 changed = True
+            if member.get("status") == "shutdown":
+                member.pop("requires_initial_plan", None)
+                member.pop("pre_plan_tool_count", None)
             member.setdefault("role", "")
         if changed:
             self._write_config(config)
         return config
+
+    def _prompt_requires_initial_plan(self, prompt: str) -> bool:
+        text = prompt.lower()
+        return "plan" in text or "approval" in text or "approve" in text
+
+    def _set_initial_plan_required(self, name: str, required: bool):
+        member = self._find_member(name)
+        if not member:
+            return
+        if required:
+            member["requires_initial_plan"] = True
+            member["pre_plan_tool_count"] = 0
+        else:
+            member.pop("requires_initial_plan", None)
+            member.pop("pre_plan_tool_count", None)
+        self._save_config()
+
+    def _check_initial_plan_gate(self, name: str, tool_name: str) -> str | None:
+        member = self._find_member(name)
+        if not member or not member.get("requires_initial_plan"):
+            return None
+        if self._is_waiting_approval(name) or tool_name == "plan_approval":
+            return None
+
+        count = int(member.get("pre_plan_tool_count", 0)) + 1
+        member["pre_plan_tool_count"] = count
+        self._save_config()
+        if count <= 6:
+            return None
+        return (
+            "Error: this task requires an initial plan. Stop inspecting files and "
+            "call the plan_approval tool now with a concise plan. Do not continue "
+            "other work until the lead approves or rejects it."
+        )
 
     def _load_config(self) -> dict:
         if not self.config_path.exists():
@@ -151,6 +188,7 @@ class TeammateManager:
         approve = bool(msg.get("approve"))
         feedback = msg.get("feedback", "")
         self._clear_plan_waiting(name, "idle")
+        self._set_initial_plan_required(name, not approve)
         if approve:
             return (
                 f"<plan_approved request_id=\"{req_id}\">"
@@ -196,6 +234,8 @@ class TeammateManager:
         )
 
         self.threads[name] = thread
+        if self._prompt_requires_initial_plan(prompt):
+            self._set_initial_plan_required(name, True)
         thread.start()
         return f"Spawned '{name}' (role: {role})"
 
@@ -208,6 +248,7 @@ class TeammateManager:
             f"Use Windows shell commands such as dir, type, cd, and where. "
             f"Do not assume Unix commands like ls, head, cat, or pwd are available. "
             f"Use send_message only for normal chat. Complete your task. "
+            f"If your prompt asks for a plan, call the plan_approval tool early, after at most a brief inspection. "
             f"Submit plans via the plan_approval tool before major work; do not send plan_approval_request with send_message. "
             f"Respond to shutdown_request with shutdown_response. "
             f"Use idle tool when you have no more work. You will auto-claim new tasks."
@@ -333,6 +374,10 @@ class TeammateManager:
 
 
     def _exec(self, sender: str, tool_name: str, args: dict) -> str:
+        initial_plan_error = self._check_initial_plan_gate(sender, tool_name)
+        if initial_plan_error:
+            return initial_plan_error
+
         safe_while_waiting = {"read_inbox", "send_message", "idle", "task_get"}
         if self._is_waiting_approval(sender) and tool_name not in safe_while_waiting:
             # FIX: plan approval execution gate
@@ -399,6 +444,7 @@ class TeammateManager:
             with _tracker_lock:
                 plan_requests[req_id] = {"from": sender, "plan": plan_text, "status": "pending"}
             self._set_plan_waiting(sender, req_id, plan_text)
+            self._set_initial_plan_required(sender, False)
 
             BUS.send(
                 sender, "lead", 

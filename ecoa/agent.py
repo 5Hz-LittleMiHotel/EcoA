@@ -10,9 +10,28 @@ from .tool_registry import TOOL_HANDLERS, TOOLS
 
 # %% ---------------- Agent loop with nag reminder injection ----------------
 
+MAX_TOOL_ROUNDS = 40
+EMPTY_INBOX_STALL_THRESHOLD = 6
+
+
+def _append_local_response(messages: list, text: str):
+    messages.append({"role": "assistant", "content": [{"type": "text", "text": text}]})
+
+
 def agent_loop(messages: list):
     rounds_since_todo = 0
+    tool_rounds = 0
+    empty_inbox_reads = 0
     while True:
+        tool_rounds += 1
+        if tool_rounds > MAX_TOOL_ROUNDS:
+            _append_local_response(
+                messages,
+                "Stopped after repeated tool calls without progress. "
+                "A teammate may still be working; use /team or press Enter later to process inbox messages.",
+            )
+            return
+
         micro_compact(messages)
         if estimate_tokens(messages) > THRESHOLD:
             print("[auto_compact triggered]")
@@ -64,6 +83,11 @@ def agent_loop(messages: list):
                     "content": output
                 })
 
+                if block.name == "read_inbox" and str(output).strip() == "[]":
+                    empty_inbox_reads += 1
+                elif block.name == "read_inbox":
+                    empty_inbox_reads = 0
+
                 if block.name == "todo":
                     used_todo = True
         rounds_since_todo = 0 if used_todo else rounds_since_todo + 1
@@ -71,6 +95,19 @@ def agent_loop(messages: list):
         if TODO.has_open_items() and rounds_since_todo >= 3:
             results.append({"type": "text", "text": "<reminder>Update your todos.</reminder>"})
             rounds_since_todo = 0
+
+        if empty_inbox_reads >= EMPTY_INBOX_STALL_THRESHOLD:
+            results.append({
+                "type": "text",
+                "text": (
+                    "<coordination_stall>"
+                    "The lead inbox has been empty after repeated checks. "
+                    "Stop polling now and tell the user that the teammate has not submitted the expected message/plan yet. "
+                    "Suggest checking /team or sending a direct reminder."
+                    "</coordination_stall>"
+                ),
+            })
+            empty_inbox_reads = 0
 
         messages.append({"role": "user","content": results})
 

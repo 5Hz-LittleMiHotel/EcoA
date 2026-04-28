@@ -56,7 +56,7 @@ TOOLS = [
      "input_schema": {"type": "object", "properties": {"command": {"type": "string"}}, "required": ["command"]}},
     {"name": "check_background", "description": "Check background task status. Omit task_id to list all.",
      "input_schema": {"type": "object", "properties": {"task_id": {"type": "string"}}}},
-    {"name": "spawn_teammate", "description": "Spawn a persistent teammate that runs in its own thread.",
+    {"name": "spawn_teammate", "description": "Spawn a persistent teammate that runs in its own thread. If the user asks the teammate to submit a plan, include an explicit instruction in the prompt to call the plan_approval tool early.",
      "input_schema": {"type": "object", "properties": {"name": {"type": "string"}, "role": {"type": "string"}, "prompt": {"type": "string"}}, "required": ["name", "role", "prompt"]}},
     {"name": "list_teammates", "description": "List all teammates with name, role, status.",
      "input_schema": {"type": "object", "properties": {}}},

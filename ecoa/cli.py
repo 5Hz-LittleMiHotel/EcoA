@@ -10,12 +10,20 @@ from .worktrees import WORKTREES
 
 def _print_latest_response(history: list):
     response_content = history[-1]["content"]
+    if isinstance(response_content, str):
+        print()
+        print("----------------------this is the response----------------------")
+        print(response_content)
     if isinstance(response_content, list):
         for block in response_content:
             if hasattr(block, "text"):
                 print()
                 print("----------------------this is the response----------------------")
                 print(block.text)
+            elif isinstance(block, dict) and block.get("type") == "text":
+                print()
+                print("----------------------this is the response----------------------")
+                print(block.get("text", ""))
     print()
 
 
