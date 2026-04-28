@@ -426,8 +426,8 @@ class TeammateManager:
             {"name": "edit_file", "description": "Replace exact text in file.",
              "input_schema": {"type": "object", "properties": {"path": {"type": "string"}, "old_text": {"type": "string"}, "new_text": {"type": "string"}}, "required": ["path", "old_text", "new_text"]}},
 
-            {"name": "send_message", "description": "Send a normal message to a teammate. Use plan_approval or shutdown_response for protocol messages.",
-             "input_schema": {"type": "object", "properties": {"to": {"type": "string"}, "content": {"type": "string"}, "msg_type": {"type": "string", "enum": ["message"]}}, "required": ["to", "content"]}},
+            {"name": "send_message", "description": "Send a normal chat message to a teammate. Use plan_approval or shutdown_response for protocol messages.",
+             "input_schema": {"type": "object", "properties": {"to": {"type": "string"}, "content": {"type": "string"}}, "required": ["to", "content"]}},
 
             {"name": "read_inbox", "description": "Read and drain your inbox.",
              "input_schema": {"type": "object", "properties": {}}},
