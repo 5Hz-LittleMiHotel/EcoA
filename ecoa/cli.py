@@ -3,6 +3,7 @@ import json
 from .agent import agent_loop
 from .config import REPO_ROOT
 from .message_bus import BUS
+from .orchestrator import orchestrate_task
 from .task_board import TASKS
 from .teammates import TEAM
 from .worktrees import WORKTREES
@@ -78,7 +79,7 @@ def main() -> None:
             continue
 
         history.append({"role": "user", "content": query})
-        agent_loop(history)
+        orchestrate_task(history)
         _print_latest_response(history)
 
 

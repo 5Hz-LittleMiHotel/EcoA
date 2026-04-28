@@ -2,7 +2,7 @@ import json
 
 from .background import BG
 from .compression import auto_compact, estimate_tokens, micro_compact
-from .config import MODEL, THRESHOLD, client
+from .config import THRESHOLD, get_model_profile
 from .message_bus import BUS
 from .prompts import SYSTEM
 from .todo import TODO
@@ -18,13 +18,46 @@ def _append_local_response(messages: list, text: str):
     messages.append({"role": "assistant", "content": [{"type": "text", "text": text}]})
 
 
-def agent_loop(messages: list):
+def latest_assistant_text(messages: list) -> str:
+    for msg in reversed(messages):
+        if msg.get("role") != "assistant":
+            continue
+        content = msg.get("content", "")
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):
+            parts = []
+            for block in content:
+                if hasattr(block, "text"):
+                    parts.append(block.text)
+                elif isinstance(block, dict) and block.get("type") == "text":
+                    parts.append(block.get("text", ""))
+            return "\n".join(part for part in parts if part).strip()
+    return ""
+
+
+def run_react_loop(
+    messages: list,
+    model_profile=None,
+    system_prompt: str | None = None,
+    tools: list | None = None,
+    tool_handlers: dict | None = None,
+    max_tokens: int = 8000,
+    max_tool_rounds: int = MAX_TOOL_ROUNDS,
+    drain_background: bool = True,
+    drain_lead_inbox: bool = True,
+    compact_messages: bool = True,
+):
+    profile = get_model_profile(model_profile)
+    active_tools = TOOLS if tools is None else tools
+    active_handlers = TOOL_HANDLERS if tool_handlers is None else tool_handlers
+    active_system = system_prompt or SYSTEM
     rounds_since_todo = 0
     tool_rounds = 0
     empty_inbox_reads = 0
     while True:
         tool_rounds += 1
-        if tool_rounds > MAX_TOOL_ROUNDS:
+        if tool_rounds > max_tool_rounds:
             _append_local_response(
                 messages,
                 "Stopped after repeated tool calls without progress. "
@@ -32,27 +65,30 @@ def agent_loop(messages: list):
             )
             return
 
-        micro_compact(messages)
-        if estimate_tokens(messages) > THRESHOLD:
+        if compact_messages:
+            micro_compact(messages)
+        if compact_messages and estimate_tokens(messages) > THRESHOLD:
             print("[auto_compact triggered]")
             messages[:] = auto_compact(messages)
 
-        notifs = BG.drain_notifications()
-        if notifs and messages:
-            notif_text = "\n".join(
-                f"[bg:{n['task_id']}] {n['status']}: {n['result']}" for n in notifs
-            )
-            messages.append({"role": "user", "content": f"<background-results>\n{notif_text}\n</background-results>"})
+        if drain_background:
+            notifs = BG.drain_notifications()
+            if notifs and messages:
+                notif_text = "\n".join(
+                    f"[bg:{n['task_id']}] {n['status']}: {n['result']}" for n in notifs
+                )
+                messages.append({"role": "user", "content": f"<background-results>\n{notif_text}\n</background-results>"})
 
-        inbox = BUS.read_inbox("lead")
-        if inbox:
-            messages.append({
-                "role": "user",
-                "content": f"<inbox>{json.dumps(inbox, indent=2)}</inbox>",
-            })
-        response = client.messages.create(
-            model=MODEL, system=SYSTEM, messages=messages,
-            tools=TOOLS, max_tokens=8000,
+        if drain_lead_inbox:
+            inbox = BUS.read_inbox("lead")
+            if inbox:
+                messages.append({
+                    "role": "user",
+                    "content": f"<inbox>{json.dumps(inbox, indent=2)}</inbox>",
+                })
+        response = profile.client.messages.create(
+            model=profile.model, system=active_system, messages=messages,
+            tools=active_tools, max_tokens=max_tokens,
         )
         messages.append({"role": "assistant","content": response.content})
         if response.stop_reason != "tool_use":
@@ -67,7 +103,7 @@ def agent_loop(messages: list):
                     output = "Compressing..."
                 else:
 
-                    handler = TOOL_HANDLERS.get(block.name)
+                    handler = active_handlers.get(block.name)
                     try:
                         output = handler(**block.input) if handler else f"Unknown tool: {block.name}"
                     except Exception as e:
@@ -115,3 +151,6 @@ def agent_loop(messages: list):
             print("[manual compact]")
             messages[:] = auto_compact(messages)
 
+
+def agent_loop(messages: list):
+    return run_react_loop(messages, model_profile="weak", system_prompt=SYSTEM)

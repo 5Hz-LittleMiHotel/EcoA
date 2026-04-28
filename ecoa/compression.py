@@ -1,7 +1,7 @@
 import json
 import time
 
-from .config import KEEP_RECENT, MODEL, TRANSCRIPT_DIR, client
+from .config import KEEP_RECENT, TRANSCRIPT_DIR, get_model_profile
 from .todo import TODO
 
 # %% ------------------------- compression -------------------------
@@ -70,8 +70,9 @@ def auto_compact(messages: list) -> list:
     print(f"[transcript saved: {transcript_path}]")
 
     conversation_text = json.dumps(messages, default=str)[:80000]
-    response = client.messages.create(
-        model=MODEL,
+    profile = get_model_profile("strong")
+    response = profile.client.messages.create(
+        model=profile.model,
         messages=[{
             "role": "user",
             "content":

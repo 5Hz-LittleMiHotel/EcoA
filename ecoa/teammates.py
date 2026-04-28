@@ -4,7 +4,7 @@ import time
 import uuid
 from pathlib import Path
 
-from .config import IDLE_TIMEOUT, MODEL, POLL_INTERVAL, TEAM_DIR, WORKDIR, client
+from .config import IDLE_TIMEOUT, POLL_INTERVAL, TEAM_DIR, WORKDIR, get_model_profile
 from .file_tools import _run_bash, _run_edit, _run_read, _run_write
 from .message_bus import BUS
 from .protocols import _tracker_lock, plan_requests, shutdown_requests
@@ -282,6 +282,7 @@ class TeammateManager:
         )
         messages = [{"role": "user", "content": prompt}]
         tools = self._teammate_tools()
+        profile = get_model_profile("weak")
         should_exit = False
         while True:
             for _ in range(50):
@@ -293,8 +294,8 @@ class TeammateManager:
                     self._set_status(name, "shutdown")
                     return
                 try:
-                    response = client.messages.create(
-                        model=MODEL,system=sys_prompt,messages=messages,
+                    response = profile.client.messages.create(
+                        model=profile.model,system=sys_prompt,messages=messages,
                         tools=tools,max_tokens=8000,)
                 except Exception:
                     break
