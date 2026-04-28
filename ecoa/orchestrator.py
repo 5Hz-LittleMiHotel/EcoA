@@ -172,8 +172,23 @@ def _run_step(
         "step_id": str(step.get("id") or ""),
         "goal": str(step.get("goal") or ""),
         "repair": repair,
+        "deliverable": bool(step.get("deliverable")) and not repair,
         "result": _truncate(result),
     }
+
+
+def _select_deliverable_results(step_results: list) -> list:
+    explicit = [
+        item for item in step_results
+        if item.get("deliverable") and item.get("result")
+    ]
+    if explicit:
+        return explicit
+
+    for item in reversed(step_results):
+        if not item.get("repair") and item.get("result"):
+            return [item]
+    return step_results[-1:] if step_results else []
 
 
 def _format_final_response(
@@ -182,26 +197,37 @@ def _format_final_response(
     step_results: list,
     reflection: dict | None,
 ) -> str:
-    lines = [
+    deliverables = _select_deliverable_results(step_results)
+    lines = []
+    for item in deliverables:
+        result = (item.get("result") or "").strip()
+        if result:
+            lines.append(result)
+
+    summary_lines = []
+    if lines:
+        summary_lines.append("---")
+    summary_lines.extend([
         f"Completed via {route['mode']}.",
         f"Steps executed: {len(step_results)}.",
-    ]
+    ])
     if plan.get("rationale"):
-        lines.append(f"Plan rationale: {plan['rationale']}")
+        summary_lines.append(f"Plan rationale: {plan['rationale']}")
 
     for item in step_results:
         label = "repair" if item.get("repair") else "step"
         result = item.get("result") or ""
         first_line = result.splitlines()[0] if result else "(no summary)"
-        lines.append(f"- {label} {item.get('step_id')}: {item.get('goal')} -> {first_line}")
+        summary_lines.append(f"- {label} {item.get('step_id')}: {item.get('goal')} -> {first_line}")
 
     if reflection:
         verdict = reflection.get("verdict", "block")
-        summary = reflection.get("summary") or "(no summary)"
-        lines.append(f"Reflection: {verdict} - {summary}")
+        reflection_summary = reflection.get("summary") or "(no summary)"
+        summary_lines.append(f"Reflection: {verdict} - {reflection_summary}")
         issues = reflection.get("issues") or []
         for issue in issues[:3]:
-            lines.append(f"- issue: {issue}")
+            summary_lines.append(f"- issue: {issue}")
+    lines.extend(summary_lines)
     return "\n".join(lines)
 
 

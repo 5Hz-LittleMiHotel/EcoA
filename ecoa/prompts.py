@@ -49,9 +49,11 @@ The JSON object must have:
 - mode: "plan_execute"
 - reflection_required: boolean
 - rationale: short string
-- steps: array of objects with id, goal, instructions, success_criteria, risk
+- steps: array of objects with id, goal, instructions, success_criteria, risk, deliverable
 
 Make steps small enough for a weaker ReAct executor. Avoid unnecessary steps.
+Set deliverable=true on the step whose result should be shown fully to the user.
+For analysis, documentation, or explanation requests, the final answer step must be deliverable=true.
 Set reflection_required=true for production-grade code, security-sensitive work,
 large refactors, architecture changes, data loss risks, or when the user asks for review.
 """

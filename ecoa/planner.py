@@ -60,6 +60,7 @@ def _normalize_plan(plan: dict, user_request: str) -> dict:
             "instructions": str(raw_step.get("instructions") or raw_step.get("goal") or ""),
             "success_criteria": str(raw_step.get("success_criteria") or "Step is complete."),
             "risk": str(raw_step.get("risk") or "medium"),
+            "deliverable": bool(raw_step.get("deliverable")),
         })
 
     return {
