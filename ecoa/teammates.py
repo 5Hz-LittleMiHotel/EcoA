@@ -43,7 +43,7 @@ class TeammateManager:
         for member in config.get("members", []):
             status = member.get("status", "shutdown")
             if status in ("working", "idle"):
-                member["status"] = "shutdown"
+                member["status"] = "idle"
                 changed = True
             if member.get("status") == "shutdown":
                 member.pop("requires_initial_plan", None)
@@ -218,7 +218,8 @@ class TeammateManager:
     def spawn(self, name: str, role: str, prompt: str) -> str:
         member = self._find_member(name)
         if member:
-            if member["status"] not in ("idle", "shutdown"):
+            existing = self.threads.get(name)
+            if existing and existing.is_alive():
                 return f"Error: '{name}' is currently {member['status']}"
             member["status"] = "working"
             member["role"] = role
@@ -239,6 +240,21 @@ class TeammateManager:
         thread.start()
         return f"Spawned '{name}' (role: {role})"
 
+    def wake(self, name: str, prompt: str = "") -> str:
+        member = self._find_member(name)
+        if not member:
+            return f"Error: Unknown teammate '{name}'"
+        if member.get("status") == "shutdown":
+            return f"Error: '{name}' is shutdown. Spawn them again to restart."
+        existing = self.threads.get(name)
+        if existing and existing.is_alive():
+            return f"'{name}' is already {member.get('status', 'working')}"
+        wake_prompt = prompt or (
+            "You are being resumed from idle. Read your inbox first, then handle "
+            "any pending messages or available tasks."
+        )
+        return self.spawn(name, member.get("role", "teammate"), wake_prompt)
+
 
 
     def _teammate_loop(self, name: str, role: str, prompt: str):
@@ -251,7 +267,7 @@ class TeammateManager:
             f"If your prompt asks for a plan, call the plan_approval tool early, after at most a brief inspection. "
             f"Submit plans via the plan_approval tool before major work; do not send plan_approval_request with send_message. "
             f"Respond to shutdown_request with shutdown_response. "
-            f"Use idle tool when you have no more work. You will auto-claim new tasks."
+            f"Use idle tool when you have no more work. Idle is a standby state, not shutdown. You will auto-claim new tasks."
         )
         messages = [{"role": "user", "content": prompt}]
         tools = self._teammate_tools()
@@ -368,8 +384,8 @@ class TeammateManager:
                     # Keep polling for lead approval instead of timing out to
                     # shutdown while the persisted gate is still active.
                     continue
-                self._set_status(name, "shutdown")
-                return
+                self._set_status(name, "idle")
+                continue
             self._set_status(name, "working")
 
 

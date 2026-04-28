@@ -18,7 +18,23 @@ def _send_lead_message(to: str, content: str, msg_type: str = "message") -> str:
             f"Error: send_message cannot send protocol type '{msg_type}'. "
             "Use shutdown_request, plan_approval, or broadcast instead."
         )
-    return BUS.send("lead", to, content, "message")
+    sent = BUS.send("lead", to, content, "message")
+    wake = TEAM.wake(to)
+    if wake.startswith("Error:"):
+        return sent
+    return f"{sent}; {wake}"
+
+
+def _broadcast_lead_message(content: str) -> str:
+    result = BUS.broadcast("lead", content, TEAM.member_names())
+    wake_results = []
+    for name in TEAM.member_names():
+        wake = TEAM.wake(name)
+        if not wake.startswith("Error:"):
+            wake_results.append(wake)
+    if wake_results:
+        return result + "\n" + "\n".join(wake_results)
+    return result
 
 
 # %% ----------- TOOOLS, ToolMap and System prompt -----------
@@ -180,7 +196,7 @@ TOOL_HANDLERS = {
     "list_teammates":  lambda **kw: TEAM.list_all(),
     "send_message":    lambda **kw: _send_lead_message(kw["to"], kw["content"], kw.get("msg_type", "message")),
     "read_inbox":      lambda **kw: json.dumps(BUS.read_inbox("lead"), indent=2),
-    "broadcast":       lambda **kw: BUS.broadcast("lead", kw["content"], TEAM.member_names()),
+    "broadcast":       lambda **kw: _broadcast_lead_message(kw["content"]),
     "shutdown_request":  lambda **kw: handle_shutdown_request(kw["teammate"]),
     "shutdown_response": lambda **kw: _check_shutdown_status(kw.get("request_id", "")),
     "plan_approval":     lambda **kw: handle_plan_review(kw["request_id"], kw["approve"], kw.get("feedback", "")),
