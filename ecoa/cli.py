@@ -1,9 +1,8 @@
 import json
 
-from .agent import agent_loop
 from .config import REPO_ROOT
 from .message_bus import BUS
-from .orchestrator import orchestrate_task
+from .orchestrator import orchestrate_task, process_orchestrator_inbox
 from .task_board import TASKS
 from .teammates import TEAM
 from .worktrees import WORKTREES
@@ -29,23 +28,10 @@ def _print_latest_response(history: list):
 
 
 def _process_lead_inbox(history: list) -> bool:
-    inbox = BUS.read_inbox("lead")
-    if not inbox:
-        return False
-
-    history.append({
-        "role": "user",
-        "content": f"<inbox>{json.dumps(inbox, indent=2)}</inbox>",
-    })
-    try:
-        agent_loop(history)
-    except Exception as exc:
-        history.pop()
-        BUS.requeue_inbox("lead", inbox)
-        print(f"Error processing lead inbox: {exc}")
-        return True
-    _print_latest_response(history)
-    return True
+    processed = process_orchestrator_inbox(history)
+    if processed:
+        _print_latest_response(history)
+    return processed
 
 
 def main() -> None:

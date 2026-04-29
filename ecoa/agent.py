@@ -4,9 +4,9 @@ from .background import BG
 from .compression import auto_compact, estimate_tokens, micro_compact
 from .config import THRESHOLD, get_model_profile
 from .message_bus import BUS
-from .prompts import SYSTEM
+from .prompts import DIRECT_EXECUTOR_SYSTEM
 from .todo import TODO
-from .tool_registry import TOOL_HANDLERS, TOOLS
+from .tool_registry import EXECUTOR_TOOL_HANDLERS, EXECUTOR_TOOLS
 
 # %% ---------------- Agent loop with nag reminder injection ----------------
 
@@ -45,13 +45,13 @@ def run_react_loop(
     max_tokens: int = 8000,
     max_tool_rounds: int = MAX_TOOL_ROUNDS,
     drain_background: bool = True,
-    drain_lead_inbox: bool = True,
+    drain_lead_inbox: bool = False,
     compact_messages: bool = True,
 ):
     profile = get_model_profile(model_profile)
-    active_tools = TOOLS if tools is None else tools
-    active_handlers = TOOL_HANDLERS if tool_handlers is None else tool_handlers
-    active_system = system_prompt or SYSTEM
+    active_tools = EXECUTOR_TOOLS if tools is None else tools
+    active_handlers = EXECUTOR_TOOL_HANDLERS if tool_handlers is None else tool_handlers
+    active_system = system_prompt or DIRECT_EXECUTOR_SYSTEM
     rounds_since_todo = 0
     tool_rounds = 0
     empty_inbox_reads = 0
@@ -61,7 +61,7 @@ def run_react_loop(
             _append_local_response(
                 messages,
                 "Stopped after repeated tool calls without progress. "
-                "A teammate may still be working; use /team or press Enter later to process inbox messages.",
+                "The current ReAct pass may be blocked; ask the orchestrator for a planned run if needed.",
             )
             return
 
@@ -153,4 +153,11 @@ def run_react_loop(
 
 
 def agent_loop(messages: list):
-    return run_react_loop(messages, model_profile="weak", system_prompt=SYSTEM)
+    return run_react_loop(
+        messages,
+        model_profile="weak",
+        system_prompt=DIRECT_EXECUTOR_SYSTEM,
+        tools=EXECUTOR_TOOLS,
+        tool_handlers=EXECUTOR_TOOL_HANDLERS,
+        drain_lead_inbox=False,
+    )

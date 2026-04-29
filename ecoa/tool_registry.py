@@ -212,5 +212,30 @@ TOOL_HANDLERS = {
     "worktree_events": lambda **kw: EVENTS.list_recent(kw.get("limit", 20)),
 }
 
+EXECUTOR_TOOL_NAMES = {
+    "bash",
+    "read_file",
+    "write_file",
+    "edit_file",
+    "todo",
+    "load_skill",
+    "compact",
+    "background_run",
+    "check_background",
+}
+
+EXECUTOR_TOOLS = [
+    tool for tool in TOOLS
+    if tool.get("name") in EXECUTOR_TOOL_NAMES
+]
+
+EXECUTOR_TOOL_HANDLERS = {
+    name: handler for name, handler in TOOL_HANDLERS.items()
+    if name in EXECUTOR_TOOL_NAMES
+}
+
+ORCHESTRATOR_TOOLS = TOOLS
+ORCHESTRATOR_TOOL_HANDLERS = TOOL_HANDLERS
+
 # 系统提示词
 
