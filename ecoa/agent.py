@@ -96,10 +96,13 @@ def run_react_loop(
         results = []
         used_todo =False 
         manual_compact = False
+        manual_compact_focus = ""
         for block in response.content:
             if block.type == "tool_use":
                 if block.name == "compact":
                     manual_compact = True
+                    block_input = block.input if isinstance(block.input, dict) else {}
+                    manual_compact_focus = str(block_input.get("focus", "") or "")
                     output = "Compressing..."
                 else:
 
@@ -149,7 +152,7 @@ def run_react_loop(
 
         if manual_compact:
             print("[manual compact]")
-            messages[:] = auto_compact(messages)
+            messages[:] = auto_compact(messages, focus=manual_compact_focus)
 
 
 def agent_loop(messages: list):

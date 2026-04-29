@@ -23,6 +23,23 @@ def _env(name: str, fallback: str | None = None) -> str | None:
     return value
 
 
+def _env_int(name: str, fallback: int) -> int:
+    value = _env(name)
+    if value is None:
+        return fallback
+    try:
+        return int(value)
+    except ValueError:
+        return fallback
+
+
+def _env_bool(name: str, fallback: bool) -> bool:
+    value = _env(name)
+    if value is None:
+        return fallback
+    return value.strip().lower() in ("1", "true", "yes", "on")
+
+
 def _make_client(api_key: str | None, base_url: str | None) -> Anthropic:
     kwargs = {}
     if api_key:
@@ -85,6 +102,13 @@ INBOX_DIR = TEAM_DIR / "inbox"
 
 THRESHOLD = 50000
 KEEP_RECENT = 3
+COMPACT_KEEP_RECENT_MESSAGES = _env_int("COMPACT_KEEP_RECENT_MESSAGES", 8)
+COMPACT_IMPORTANCE_MIN_SCORE = _env_int("COMPACT_IMPORTANCE_MIN_SCORE", 6)
+COMPACT_MAX_IMPORTANT_RECORDS = _env_int("COMPACT_MAX_IMPORTANT_RECORDS", 40)
+COMPACT_LLM_CANDIDATE_LIMIT = _env_int("COMPACT_LLM_CANDIDATE_LIMIT", 80)
+COMPACT_INPUT_CHAR_BUDGET = _env_int("COMPACT_INPUT_CHAR_BUDGET", 80000)
+COMPACT_MAX_RECORD_CHARS = _env_int("COMPACT_MAX_RECORD_CHARS", 5000)
+COMPACT_USE_WEAK_LLM_SCORING = _env_bool("COMPACT_USE_WEAK_LLM_SCORING", True)
 POLL_INTERVAL = 5
 IDLE_TIMEOUT = 60
 
