@@ -627,9 +627,13 @@ def summarize_with_strong_llm(
         "Merge the previous summary with the important records and recent context. "
         "Newer decisions override older conflicting decisions. Preserve explicit user requirements, "
         "confirmed decisions, current state, open tasks, important files/functions/config, critical errors, "
-        "blockers, and next steps. Drop repetitive polling, raw dumps, and stale tool output.\n\n"
+        "blockers, and next steps. Treat this as memory reconstruction, not as a new user request. "
+        "Do not convert remembered constraints, risks, or blockers into action items unless the records "
+        "explicitly ask the agent to act on them now. Drop repetitive polling, raw dumps, and stale tool output.\n\n"
         "Return concise plain text with these sections when relevant: User requirements, Confirmed decisions, "
-        "Current state, Important files or symbols, Errors or blockers, Open tasks, Next steps.\n\n"
+        "Remembered constraints or risks, Current state, Important files or symbols, Errors or blockers, "
+        "Open tasks, Next steps. Put an item under Open tasks or Next steps only when it is explicitly "
+        "an unfinished action, not merely something the user asked to remember.\n\n"
         f"<transcript_path>\n{transcript_path}\n</transcript_path>\n\n"
         f"<focus>\n{focus or '(none)'}\n</focus>\n\n"
         f"<previous_summary>\n{_truncate_text(previous_summary, previous_budget) or '(none)'}\n</previous_summary>\n\n"
@@ -730,6 +734,6 @@ def auto_compact(messages: list, focus: str = "") -> list:
         },
         {
             "role": "assistant",
-            "content": "Understood. I have the context from the summary. Continuing."
+            "content": "Understood. I have restored the compressed context. This summary is memory, not a new user request."
         },
     ]
